@@ -9,6 +9,7 @@ import typing
 from collections import OrderedDict
 import enum
 from plistlib import dumps as plist_dumps
+from urllib.parse import quote
 
 lib_path = os.path.join(os.path.dirname(__file__), "lib")
 if lib_path not in sys.path:
@@ -58,7 +59,7 @@ class AutopkgVendorer(Processor):
         return od
 
     def download_text_file(self, session, repo: str, path: str, commit_sha: str) -> str:
-        raw_url = f"https://raw.githubusercontent.com/{repo}/{commit_sha}/{path}"
+        raw_url = f"https://raw.githubusercontent.com/{repo}/{commit_sha}/{quote(path, safe='/')}"
         temp_file = tempfile.mktemp()
         curl_cmd = ["/usr/bin/curl", "--location", "--silent", "--fail", "--output", temp_file, raw_url]
 
@@ -111,6 +112,11 @@ class AutopkgVendorer(Processor):
             plist_data = plist_loads(file_contents.encode("utf-8"))
             plist_data = dict(plist_data)
 
+            # Remove trust info as it's not relevant for vendored recipes
+            if 'ParentRecipeTrustInfo' in plist_data:
+                del plist_data['ParentRecipeTrustInfo']
+                self.output(f"Removed ParentRecipeTrustInfo from: {item_path}")
+
             if opinionated_ordering:
                 for step_index, step in enumerate(plist_data.get('Process', [])):
                     reordered_step = self.move_keys_to_top(step, ['Processor', 'Arguments'])
@@ -137,7 +143,7 @@ class AutopkgVendorer(Processor):
             f.write(full_contents)
 
     def vendor_path(self, session, repo: str, path: str, commit_sha: str, dest_base, rel_base="", convert_to_yaml=False, opinionated_ordering=True):
-        endpoint = f"/repos/{repo}/contents/{path}"
+        endpoint = f"/repos/{repo}/contents/{quote(path, safe='/')}"
         query = f"ref={commit_sha}"
 
         response_json, status = session.call_api(endpoint, query=query)
