@@ -105,6 +105,12 @@ class AutopkgVendorer(Processor):
         return item_name.lower() == "license"
 
     def process_file(self, session, repo, item_path: str, item_name: str, commit_sha: str, dest_path: str, convert_to_yaml: bool = False, opinionated_ordering: bool = True):
+        # Only process text-based files
+        text_extensions = ('.md', '.py', '.yaml', '.recipe')
+        if not item_name.endswith(text_extensions):
+            self.output(f"Skipping non-text file: {item_path}")
+            return
+
         file_contents = self.download_text_file(session, repo, item_path, commit_sha)
         self.output(f"Downloaded: {item_path} → {dest_path}")
 
